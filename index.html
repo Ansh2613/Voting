@@ -218,6 +218,18 @@
         .hidden {
             display: none !important;
         }
+        /* Style for disabled message */
+        .disabled-message {
+            text-align: center;
+            padding: 8px;
+            border-radius: 12px;
+            margin-bottom: 8px;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #1e40af; /* Darker blue text */
+            background-color: #dbeafe; /* Light blue background */
+            border: 1px solid #93c5fd; /* Blue border */
+        }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
@@ -425,10 +437,18 @@
             const alertMessage = document.getElementById('alert-message');
             const alertOkBtn = document.getElementById('alert-ok-btn');
 
+            // --- Feature Toggles and Custom Messages ---
+            const IS_VOTING_ENABLED = false; // Set to false to disable voting
+            const VOTING_DISABLED_CUSTOM_MESSAGE = "Voting is tomorrow. Please check back tomorrow at 1 pm !";
+
+            const IS_REGISTRATION_ENABLED = true; // Set to false to disable candidate registration
+            const REGISTRATION_DISABLED_CUSTOM_MESSAGE = "Candidate registration is not available at this time.";
+            // --- End Feature Toggles ---
+
             // --- Constants & State Variables ---
             const API_BASE_URL = 'https://votings.1987sakshamsingh.workers.dev/api';
             const placeholderImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAQAAADa613fAAAAaElEQVR42u3PQREAAAgDoC2G/Yt62e20IIDz9wYBAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgMDbA3cAAR2gLdJPAAAAAElFTkSuQmCC';
-            const MAX_IMAGE_SIZE_MB = 5;
+            const MAX_IMAGE_SIZE_KB = 100; // Set image size limit to 100KB
 
             let candidates = [];
             let votes = [];
@@ -529,6 +549,22 @@
              */
             function updateVoteSectionUI() {
                 // This function is now only called AFTER a successful initial login
+
+                // Check if voting is generally enabled
+                if (!IS_VOTING_ENABLED) {
+                    voteSectionDetails.classList.remove('hidden'); // Ensure container is visible for message
+                    playerInfoDisplay.classList.add('hidden');
+                    realNameInput.classList.add('hidden');
+                    contactInfoInput.classList.add('hidden');
+                    enteredDetailsDisplay.classList.add('hidden');
+                    partyListForVoting.classList.add('hidden');
+                    votingDisabledMessage.classList.remove('hidden');
+                    votingDisabledMessage.innerHTML = `<p class="text-xl font-semibold">${VOTING_DISABLED_CUSTOM_MESSAGE}</p>`;
+                    votingDisabledMessage.classList.remove('bg-red-100', 'border-red-300', 'text-red-700');
+                    votingDisabledMessage.classList.add('disabled-message'); // Apply custom style
+                    return; // Exit early if voting is disabled
+                }
+
                 voteSectionDetails.classList.remove('hidden');
 
                 // Display player info from the validated voting ID
@@ -550,6 +586,14 @@
 
                 if (isVotingDisabledForUsedId) {
                     votingDisabledMessage.classList.remove('hidden');
+                    votingDisabledMessage.innerHTML = `
+                        <p class="text-xl font-semibold">
+                            This Voting ID has already been used. You cannot cast another vote.
+                        </p>
+                        <p class="text-sm mt-2">You can still view live vote counts and candidate information.</p>
+                    `;
+                    votingDisabledMessage.classList.add('bg-red-100', 'border-red-300', 'text-red-700');
+                    votingDisabledMessage.classList.remove('disabled-message'); // Remove custom style if it was applied
                     partyListForVoting.classList.add('hidden');
                 } else {
                     votingDisabledMessage.classList.add('hidden');
@@ -617,7 +661,6 @@
                         liveVoteCountDiv.appendChild(div);
                     });
                 } else {
-                    // Corrected: Use liveVoteCountDiv instead of liveVoteDiv
                     liveVoteCountDiv.innerHTML = '<p class="text-center text-gray-500">No votes cast yet.</p>';
                     liveVoteCountDiv.classList.add('text-center', 'text-gray-500');
                 }
@@ -670,6 +713,12 @@
                             showCustomAlert('This Voting ID has already been used. You cannot cast another vote.');
                             return;
                         }
+                        // Check IS_VOTING_ENABLED before allowing vote submission
+                        if (!IS_VOTING_ENABLED) {
+                            showCustomAlert(VOTING_DISABLED_CUSTOM_MESSAGE);
+                            return;
+                        }
+
 
                         const voteData = {
                             votingId: currentVotingId,
@@ -833,8 +882,9 @@
             partyLogoUpload.addEventListener('change', (event) => {
                 const file = event.target.files[0];
                 if (file) {
-                    if (file.size > MAX_IMAGE_SIZE_MB * 1024 * 1024) {
-                        showCustomAlert(`Image size should be less than ${MAX_IMAGE_SIZE_MB}MB.`);
+                    // Changed MAX_IMAGE_SIZE_MB to MAX_IMAGE_SIZE_KB and updated calculation
+                    if (file.size > MAX_IMAGE_SIZE_KB * 1024) {
+                        showCustomAlert(`Image size should be less than ${MAX_IMAGE_SIZE_KB}KB.`);
                         event.target.value = '';
                         logoPreview.src = placeholderImage;
                         return;
@@ -850,6 +900,12 @@
             // Register Candidate Form Submission
             registerCandidateForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
+
+                // Check if registration is generally enabled
+                if (!IS_REGISTRATION_ENABLED) {
+                    showCustomAlert(REGISTRATION_DISABLED_CUSTOM_MESSAGE);
+                    return;
+                }
 
                 const candidateName = document.getElementById('candidate-name').value;
                 const partyName = document.getElementById('party-name-reg').value;
@@ -888,6 +944,19 @@
             });
 
             // --- Initial Setup on Load ---
+            // Hide registration tab and content if disabled
+            if (!IS_REGISTRATION_ENABLED) {
+                tabRegisterCandidate.classList.add('hidden'); // Hide the tab button
+                contentRegisterCandidate.innerHTML = `
+                    <div class="disabled-message">
+                        <p>${REGISTRATION_DISABLED_CUSTOM_MESSAGE}</p>
+                    </div>
+                `;
+                // Ensure the form is hidden if the tab is not enabled
+                document.getElementById('register-candidate-form').classList.add('hidden');
+            }
+
+
             // Determine which screen to show on page load
             if (currentVotingId) {
                 // Attempt to retrieve stored voting ID data
